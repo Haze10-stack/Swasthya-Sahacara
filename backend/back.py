@@ -21,132 +21,114 @@ CORS(app)
 WORQHAT_API_KEY = os.getenv('WORQHAT_API_KEY')
 WORQHAT_API_URL = "https://api.worqhat.com/api/ai/content/v4"
 
-def format_health_context(context):
-    """Format health context into a string for training data"""
-    try:
-        formatted_context = f"""
-Current Health Stats:
-- Total Calories Consumed: {context.get('totalCalories', 0)} calories
-- Mood Rating: {context.get('moodRating', 0)}/5
-- Water Intake: {context.get('waterIntake', 0)} glasses
-
-Please provide health advice based on these stats.
-"""
-        print(f"Formatted context: {formatted_context}", file=sys.stderr)
-        return formatted_context
-    except Exception as e:
-        print(f"Error in format_health_context: {str(e)}", file=sys.stderr)
-        raise
+def generate_health_response(health_context):
+    """Generate structured health advice based on user stats"""
+    
+    response = {
+        "overview": {
+            "calories": {
+                "current": health_context.get('totalCalories', 0),
+                "goal": 2000,
+                "status": "on_track" if health_context.get('totalCalories', 0) <= 2000 else "exceeding"
+            },
+            "mood": {
+                "rating": health_context.get('moodRating', 0),
+                "status": "positive" if health_context.get('moodRating', 0) >= 4 else "needs_attention"
+            },
+            "water": {
+                "current": health_context.get('waterIntake', 0),
+                "goal": 8,
+                "status": "needs_attention" if health_context.get('waterIntake', 0) < 8 else "on_track"
+            }
+        },
+        "recommendations": []
+    }
+    
+    # Generate dynamic recommendations
+    if response["overview"]["water"]["status"] == "needs_attention":
+        response["recommendations"].append({
+            "category": "hydration",
+            "advice": "Increase water intake to 8 glasses per day",
+            "priority": "high",
+            "tips": ["Set hourly reminders", "Keep a water bottle nearby"]
+        })
+    
+    if response["overview"]["calories"]["status"] == "exceeding":
+        response["recommendations"].append({
+            "category": "nutrition",
+            "advice": f"Consider reducing calorie intake. Currently {response['overview']['calories']['current']} vs goal {response['overview']['calories']['goal']}",
+            "priority": "medium",
+            "tips": ["Track portion sizes", "Choose nutrient-dense foods"]
+        })
+        
+    return response
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    print("\n--- New Chat Request ---", file=sys.stderr)
     try:
-        # Log raw request data
-        raw_data = request.get_data()
-        print(f"Raw request data: {raw_data}", file=sys.stderr)
-        
-        # Validate JSON
-        if not request.is_json:
-            print("Error: Request is not JSON", file=sys.stderr)
-            return jsonify({'error': 'Request must be JSON'}), 400
-
-        # Parse JSON data
-        try:
-            data = request.json
-            print(f"Parsed JSON data: {json.dumps(data, indent=2)}", file=sys.stderr)
-        except Exception as e:
-            print(f"JSON parsing error: {str(e)}", file=sys.stderr)
-            return jsonify({'error': 'Invalid JSON format'}), 400
-
-        # Validate API key
-        if not WORQHAT_API_KEY:
-            print("Error: No API key found", file=sys.stderr)
-            return jsonify({'error': 'No API key configured'}), 500
-
-        # Extract and validate message
-        user_message = data.get('message')
-        if not user_message:
-            print("Error: No message in request", file=sys.stderr)
-            return jsonify({'error': 'No message provided'}), 400
-
-        # Extract health context
+        data = request.json
         health_context = data.get('healthContext', {})
-        print(f"Health context received: {json.dumps(health_context, indent=2)}", file=sys.stderr)
+        user_message = data.get('message', '')
+        
+        # Generate structured health response
+        health_analysis = generate_health_response(health_context)
+        
+        # Format training data for AI
+        training_prompt = f"""You are Swasthya Sahacara, a knowledgeable and empathetic health AI assistant.
 
-        # Format training data
-        try:
-            training_data = format_health_context(health_context)
-        except Exception as e:
-            print(f"Error formatting health context: {str(e)}", file=sys.stderr)
-            return jsonify({'error': 'Error formatting health context'}), 500
+Current Health Analysis:
+• Calories: {health_analysis['overview']['calories']['current']}/{health_analysis['overview']['calories']['goal']} calories
+• Mood Rating: {health_analysis['overview']['mood']['rating']}/5
+• Water Intake: {health_analysis['overview']['water']['current']}/{health_analysis['overview']['water']['goal']} glasses
 
-        # Prepare API request
+Key Concerns:
+{json.dumps(health_analysis['recommendations'], indent=2)}
+
+Please provide personalized health advice based on these metrics. Consider both physical and mental well-being. Keep responses encouraging and actionable.
+
+User Query: {user_message}
+
+Remember to:
+1. Address immediate health concerns
+2. Provide practical, achievable recommendations 
+3. Maintain a supportive and motivating tone
+4. Include scientific backing when relevant
+5. Suggest lifestyle modifications if appropriate
+"""
+
+        # API request
         headers = {
             "Authorization": f"Bearer {WORQHAT_API_KEY}",
             "Content-Type": "application/json"
         }
 
         payload = {
-            "training_data": training_data,
+            "training_data": training_prompt,
             "question": user_message,
             "model": "aicon-v4-large-160824",
             "temperature": 0.3,
             "max_tokens": 1000
         }
 
-        print(f"Prepared API payload: {json.dumps(payload, indent=2)}", file=sys.stderr)
+        response = requests.post(
+            WORQHAT_API_URL,
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
 
-        # Make API request
-        try:
-            print("Sending request to WorqHat API...", file=sys.stderr)
-            response = requests.post(
-                WORQHAT_API_URL,
-                headers=headers,
-                json=payload,
-                timeout=30
-            )
-            
-            print(f"WorqHat API Response Status: {response.status_code}", file=sys.stderr)
-            print(f"WorqHat API Response Headers: {dict(response.headers)}", file=sys.stderr)
-            print(f"WorqHat API Response Body: {response.text}", file=sys.stderr)
-
-            # Handle non-200 responses
-            if response.status_code != 200:
-                error_message = f"WorqHat API Error (Status {response.status_code}): {response.text}"
-                print(error_message, file=sys.stderr)
-                return jsonify({'error': error_message}), 500
-
-            # Parse response
-            try:
-                result = response.json()
-                print(f"Parsed API response: {json.dumps(result, indent=2)}", file=sys.stderr)
-            except json.JSONDecodeError as e:
-                print(f"Error parsing API response: {str(e)}", file=sys.stderr)
-                return jsonify({'error': 'Invalid response from API'}), 500
-
+        if response.status_code == 200:
+            result = response.json()
             return jsonify({
                 'status': 'success',
-                'message': result.get('content', result.get('text', 'No response content'))
+                'message': result.get('content', result.get('text', 'No response content')),
+                'analysis': health_analysis
             })
-
-        except requests.exceptions.RequestException as e:
-            print(f"Request Exception: {str(e)}", file=sys.stderr)
-            print(f"Exception details: {traceback.format_exc()}", file=sys.stderr)
-            return jsonify({
-                'error': f'Request failed: {str(e)}'
-            }), 500
-
+        else:
+            return jsonify({'error': f'API Error: {response.text}'}), response.status_code
+            
     except Exception as e:
-        print(f"Unexpected error: {str(e)}", file=sys.stderr)
-        print(f"Full traceback: {traceback.format_exc()}", file=sys.stderr)
-        return jsonify({
-            'error': f'Unexpected error: {str(e)}',
-            'traceback': traceback.format_exc()
-        }), 500
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    print("\n=== Starting Flask Server ===", file=sys.stderr)
-    print(f"WORQHAT_API_KEY configured: {'Yes' if WORQHAT_API_KEY else 'No'}", file=sys.stderr)
-    print(f"API URL: {WORQHAT_API_URL}", file=sys.stderr)
     app.run(debug=True, port=5000)
