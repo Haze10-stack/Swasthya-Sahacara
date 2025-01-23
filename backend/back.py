@@ -6,8 +6,6 @@ import os
 import sys
 import traceback
 import json
-
-# Force print statements and errors to stdout/stderr
 import sys
 import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -27,9 +25,9 @@ def generate_health_response(health_context):
     response = {
         "overview": {
             "calories": {
-                "current": health_context.get('totalCalories', 0),
-                "goal": 2000,
-                "status": "on_track" if health_context.get('totalCalories', 0) <= 2000 else "exceeding"
+                "current": health_context.get('calories', 0),  # Changed from totalCalories
+                "goal": health_context.get('calorieGoal', 2000),
+                "status": "on_track" if health_context.get('calories', 0) <= health_context.get('calorieGoal', 2000) else "exceeding"
             },
             "mood": {
                 "rating": health_context.get('moodRating', 0),
@@ -37,14 +35,14 @@ def generate_health_response(health_context):
             },
             "water": {
                 "current": health_context.get('waterIntake', 0),
-                "goal": 8,
-                "status": "needs_attention" if health_context.get('waterIntake', 0) < 8 else "on_track"
+                "goal": health_context.get('waterGoal', 20),
+                "status": "needs_attention" if health_context.get('waterIntake', 0) < 15 else "on_track"
             }
         },
         "recommendations": []
-    }
+         }
     
-    # Generate dynamic recommendations
+    
     if response["overview"]["water"]["status"] == "needs_attention":
         response["recommendations"].append({
             "category": "hydration",
@@ -74,12 +72,18 @@ def chat():
         health_analysis = generate_health_response(health_context)
         
         # Format training data for AI
-        training_prompt = f"""You are Swasthya Sahacara, a knowledgeable and empathetic health AI assistant.
+        training_prompt = f"""You are Swasthya Sahacara, a knowledgeable and empathetic health AI assistant. You communicate in a clear, well-structured manner using proper formatting and paragraphs.
 
-Current Health Analysis:
-• Calories: {health_analysis['overview']['calories']['current']}/{health_analysis['overview']['calories']['goal']} calories
-• Mood Rating: {health_analysis['overview']['mood']['rating']}/5
-• Water Intake: {health_analysis['overview']['water']['current']}/{health_analysis['overview']['water']['goal']} glasses
+CURRENT HEALTH METRICS
+---------------------
+🔸 Calories: {health_analysis['overview']['calories']['current']}/{health_analysis['overview']['calories']['goal']} calories
+   Status: {health_analysis['overview']['calories']['status'].replace('_', ' ').title()}
+
+🔸 Mood: {health_analysis['overview']['mood']['rating']}/5
+   Status: {health_analysis['overview']['mood']['status'].replace('_', ' ').title()}
+
+🔸 Water Intake: {health_analysis['overview']['water']['current']}/{health_analysis['overview']['water']['goal']} glasses
+   Status: {health_analysis['overview']['water']['status'].replace('_', ' ').title()}
 
 Key Concerns:
 {json.dumps(health_analysis['recommendations'], indent=2)}
@@ -87,13 +91,29 @@ Key Concerns:
 Please provide personalized health advice based on these metrics. Consider both physical and mental well-being. Keep responses encouraging and actionable.
 
 User Query: {user_message}
+Response Guidelines:
+1. Start with a warm, personalized greeting
+2. Break your response into clear sections using paragraph breaks
+3. Use bullet points for listing multiple recommendations
+4. Include specific numbers and metrics when discussing goals
+5. End with an encouraging note and invitation for follow-up questions
+
+Format your response in this structure:
+1. Greeting and acknowledgment of the query
+2. Analysis of current health metrics (if relevant to query)
+3. Specific recommendations and actionable advice
+4. Scientific explanation (if applicable)
+5. Encouraging conclusion
 
 Remember to:
-1. Address immediate health concerns
-2. Provide practical, achievable recommendations 
-3. Maintain a supportive and motivating tone
-4. Include scientific backing when relevant
-5. Suggest lifestyle modifications if appropriate
+- Address immediate health concerns first
+- Provide practical, achievable recommendations
+- Maintain a supportive and motivating tone
+- Include scientific backing when relevant
+- Suggest lifestyle modifications if appropriate
+- For heavy meals, provide specific portion control advice and meal planning tips
+
+
 """
 
         # API request
@@ -105,16 +125,14 @@ Remember to:
         payload = {
             "training_data": training_prompt,
             "question": user_message,
-            "model": "aicon-v4-large-160824",
-            "temperature": 0.3,
-            "max_tokens": 1000
+            "model": "aicon-v4-nano-160824",
+            "randomness": 0.3,
         }
 
         response = requests.post(
             WORQHAT_API_URL,
             headers=headers,
             json=payload,
-            timeout=30
         )
 
         if response.status_code == 200:

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo , useEffect } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,50 @@ import {
   Calendar,
   TrendingUp
 } from 'lucide-react';
-import './App.css'
+import { Search } from 'lucide-react';
+
+const indianFoods = [
+  { name: 'Dal (Yellow)', caloriesPer100g: 116, servingSize: '1 katori (150g)' },
+  { name: 'Chapati', caloriesPer100g: 264, servingSize: '1 piece (30g)' },
+  { name: 'Steamed Rice', caloriesPer100g: 130, servingSize: '1 katori (150g)' },
+  { name: 'Palak Paneer', caloriesPer100g: 180, servingSize: '1 katori (200g)' },
+  { name: 'Chicken Curry', caloriesPer100g: 190, servingSize: '1 katori (200g)' },
+  { name: 'Samosa', caloriesPer100g: 262, servingSize: '1 piece (50g)' },
+  { name: 'Butter Chicken', caloriesPer100g: 280, servingSize: '1 serving (200g)' },
+  { name: 'Rajma', caloriesPer100g: 140, servingSize: '1 katori (150g)' },
+  { name: 'Chana Masala', caloriesPer100g: 160, servingSize: '1 katori (150g)' },
+  { name: 'Aloo Gobi', caloriesPer100g: 120, servingSize: '1 katori (150g)' },
+  { name: 'Bhindi Masala', caloriesPer100g: 108, servingSize: '1 katori (150g)' },
+  { name: 'Tandoori Roti', caloriesPer100g: 297, servingSize: '1 piece (40g)' },
+  { name: 'Vegetable Biryani', caloriesPer100g: 185, servingSize: '1 plate (250g)' },
+  { name: 'Paneer Butter Masala', caloriesPer100g: 233, servingSize: '1 katori (200g)' },
+  { name: 'Malai Kofta', caloriesPer100g: 222, servingSize: '2 pieces with gravy (175g)' },
+  { name: 'Mixed Vegetable Curry', caloriesPer100g: 112, servingSize: '1 katori (150g)' },
+  { name: 'Egg Curry', caloriesPer100g: 160, servingSize: '1 katori (200g)' },
+  { name: 'Jeera Rice', caloriesPer100g: 138, servingSize: '1 katori (150g)' },
+  { name: 'Masoor Dal', caloriesPer100g: 119, servingSize: '1 katori (150g)' },
+  { name: 'Chicken Tandoori', caloriesPer100g: 198, servingSize: '2 pieces (200g)' },
+  { name: 'Paratha', caloriesPer100g: 320, servingSize: '1 piece (60g)' },
+  { name: 'Fish Curry', caloriesPer100g: 160, servingSize: '1 katori (200g)' },
+  { name: 'Mutton Curry', caloriesPer100g: 223, servingSize: '1 katori (200g)' },
+  { name: 'Vegetable Pakora', caloriesPer100g: 290, servingSize: '4 pieces (80g)' },
+  { name: 'Idli', caloriesPer100g: 146, servingSize: '2 pieces (80g)' },
+  { name: 'Dosa Plain', caloriesPer100g: 184, servingSize: '1 piece (80g)' },
+  { name: 'Masala Dosa', caloriesPer100g: 188, servingSize: '1 piece (120g)' },
+  { name: 'Upma', caloriesPer100g: 150, servingSize: '1 katori (200g)' },
+  { name: 'Poha', caloriesPer100g: 140, servingSize: '1 katori (150g)' },
+  { name: 'Sambhar', caloriesPer100g: 76, servingSize: '1 katori (150g)' },
+  { name: 'Chicken Biryani', caloriesPer100g: 195, servingSize: '1 plate (250g)' },
+  { name: 'Naan', caloriesPer100g: 312, servingSize: '1 piece (80g)' },
+  { name: 'Butter Naan', caloriesPer100g: 350, servingSize: '1 piece (85g)' },
+  { name: 'Chicken Korma', caloriesPer100g: 210, servingSize: '1 katori (200g)' },
+  { name: 'Paneer Tikka', caloriesPer100g: 265, servingSize: '6 pieces (150g)' },
+  { name: 'Dal Makhani', caloriesPer100g: 176, servingSize: '1 katori (150g)' },
+  { name: 'Pav Bhaji', caloriesPer100g: 184, servingSize: '1 serving (250g)' },
+  { name: 'Vada Pav', caloriesPer100g: 289, servingSize: '1 piece (120g)' },
+  { name: 'Khichdi', caloriesPer100g: 128, servingSize: '1 katori (200g)' },
+  { name: 'Chole Bhature', caloriesPer100g: 360, servingSize: '2 bhature with chole (300g)' }
+];
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -42,7 +85,7 @@ const Dashboard = () => {
     lunch: 0,
     snacks: 0,
     dinner: 0
-  });
+  }); 
   const [waterIntake, setWaterIntake] = useState(0);
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'Hello! I am your AI health assistant. How can I help you today?' }
@@ -63,12 +106,94 @@ const Dashboard = () => {
       mood: Math.floor(Math.random() * 2 + 3)
     }));
   });
-
-  const waterGoal = 8;
+  
+  const [indianFoodSearch, setIndianFoodSearch] = useState('');
+const [portion, setPortion] = useState('1');
+const [searchResults, setSearchResults] = useState([]);
+  const waterGoal = 20;
   const totalCalories = [...meals, ...Object.entries(calories).map(([name, cal]) => ({ 
     name, 
     calories: Number(cal) 
   }))].reduce((sum, meal) => sum + Number(meal.calories), 0);
+  useEffect(() => {
+    if (indianFoodSearch) {
+      const filtered = indianFoods.filter(food =>
+        food.name.toLowerCase().includes(indianFoodSearch.toLowerCase())
+      );
+      setSearchResults(filtered);
+    } else {
+      setSearchResults([]);
+    }
+  }, [indianFoodSearch]);
+  const calculateCalories = (food) => {
+    const portionMultiplier = parseFloat(portion);
+    const standardServing = parseInt(food.servingSize.match(/\d+/)[0]);
+    return Math.round((food.caloriesPer100g * standardServing / 100) * portionMultiplier);
+  };
+  const handleAddIndianFood = (food) => {
+    const calories = calculateCalories(food);
+    const newMeal = {
+      name: `${food.name} (${portion} ${portion === '1' ? 'serving' : 'servings'})`,
+      calories: calories
+    };
+    setMeals([...meals, newMeal]);
+    setIndianFoodSearch('');
+    setPortion('1');
+  };
+  const renderIndianFoodCalculator = () => (
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center text-lg">
+          <Search className="mr-2 h-5 w-5 text-orange-600" />
+          Food Calculator
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search for Indian dishes..."
+                value={indianFoodSearch}
+                onChange={(e) => setIndianFoodSearch(e.target.value)}
+              />
+            </div>
+            <div className="w-32">
+              <Input
+                type="number"
+                min="0.25"
+                step="0.25"
+                placeholder="Portions"
+                value={portion}
+                onChange={(e) => setPortion(e.target.value)}
+              />
+            </div>
+          </div>
+  
+          {searchResults.length > 0 && (
+            <ScrollArea className="h-64 border rounded-lg p-4">
+              {searchResults.map((food, index) => (
+                <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div>
+                    <p className="font-medium">{food.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {food.servingSize} • {food.caloriesPer100g} cal/100g
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="font-bold">{calculateCalories(food)} cal</span>
+                    <Button size="sm" onClick={() => handleAddIndianFood(food)}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </ScrollArea>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   const moodIcons = {
     1: { icon: Frown, label: "Very Unhappy", color: "text-red-500" },
@@ -108,7 +233,6 @@ const Dashboard = () => {
     }
   };
 
-  // Chat functionality
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
@@ -139,7 +263,7 @@ const Dashboard = () => {
         },
         body: JSON.stringify({
           message: inputMessage,
-          context: healthContext
+          healthContext: healthContext 
         })
       });
 
@@ -164,8 +288,66 @@ const Dashboard = () => {
     }
   };
 
+  const quotes = [
+    {
+      text: "The greatest wealth is health.",
+      author: "Virgil"
+    },
+    {
+      text: "Take care of your body. It's the only place you have to live.",
+      author: "Jim Rohn"
+    },
+    {
+      text: "Health is not valued until sickness comes.",
+      author: "Thomas Fuller"
+    },
+    {
+      text: "Your body hears everything your mind says.",
+      author: "Naomi Judd"
+    },
+    {
+      text: "The food you eat can be either the safest and most powerful form of medicine or the slowest form of poison.",
+      author: "Ann Wigmore"
+    },
+    {
+      text: "Let food be thy medicine and medicine be thy food.",
+      author: "Hippocrates"
+    }
+  ];
+
+  // State for current quote
+  const [currentQuote, setCurrentQuote] = useState(0);
+
+  // Effect to rotate quotes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentQuote(prev => (prev + 1) % quotes.length);
+    }, 10000); // Change quote every 10 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const renderQuoteSection = () => (
+    
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle className="flex items-center text-lg">
+          <Bot className="mr-2 h-5 w-5 text-yellow-600" />
+          Daily Inspiration
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-center">
+          <p className="text-lg italic mb-2">"{quotes[currentQuote].text}"</p>
+          <p className="text-sm text-muted-foreground">— {quotes[currentQuote].author}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   const renderDashboardContent = () => (
     <>
+    {renderQuoteSection()}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardHeader>
@@ -214,7 +396,7 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center text-lg">
               <Droplets className="mr-2 h-5 w-5 text-blue-600" />
-              Water Intake
+              Water Intake (250ml)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -234,30 +416,44 @@ const Dashboard = () => {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center text-lg">
-              <Brain className="mr-2 h-5 w-5 text-green-600" />
-              Mood
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between">
-              {[1, 2, 3, 4, 5].map((rating) => (
-                <Button
-                  key={rating}
-                  variant={moodRating === rating ? "default" : "outline"}
-                  onClick={() => setMoodRating(rating)}
-                  className="w-10 h-10 p-0 rounded-full"
-                >
-                  {React.createElement(moodIcons[rating].icon, {
-                    className: `h-5 w-5 ${moodRating === rating ? 'text-primary-foreground' : moodIcons[rating].color}`,
-                  })}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+  <CardHeader>
+    <CardTitle className="flex items-center text-lg">
+      <Brain className="mr-2 h-5 w-5 text-green-600" />
+      Mood
+    </CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="flex justify-between items-center gap-2">
+      {[1, 2, 3, 4, 5].map((rating) => {
+        const Icon = moodIcons[rating].icon;
+        const isSelected = moodRating === rating;
+        return (
+          <Button
+            key={rating}
+            variant={isSelected ? "default" : "outline"}
+            onClick={() => setMoodRating(rating)}
+            className="w-10 h-10 p-0 rounded-full relative group"
+          >
+            <Icon
+              className={`h-5 w-5 ${isSelected ? "text-primary-foreground" : moodIcons[rating].color}`}
+            />
+            {/* Tooltip */}
+            <span
+              className="absolute bottom-[-1.5rem] left-1/2 transform -translate-x-1/2 
+                bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition"
+            >
+              {moodIcons[rating].label}
+            </span>
+          </Button>
+        );
+      })}
+    </div>
+  </CardContent>
+</Card>
+
       </div>
+
+      {renderIndianFoodCalculator()}
 
       <Card className="mb-8">
         <CardHeader>
@@ -367,24 +563,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dailyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="calories" stroke="#8884d8" />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Daily Water Intake</CardTitle>
-          </CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dailyData}>
+              <BarChart data={dailyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
@@ -494,7 +673,7 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="min-h-screen w-full flex bg-background text-foreground">
+    <div className="h-screen w-screen min-h-screen  flex bg-background text-foreground">
       <div className="w-64 border-r bg-card">
         <div className="p-4">
           <h1 className="text-xl font-bold text-purple-600">Swasthya Sahacara</h1>
