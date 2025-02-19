@@ -1,13 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests
+import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 import sys
 import traceback
 import json
-import sys
 import io
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
@@ -16,8 +16,8 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-WORQHAT_API_KEY = os.getenv('WORQHAT_API_KEY')
-WORQHAT_API_URL = "https://api.worqhat.com/api/ai/content/v4"
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+genai.configure(api_key=GEMINI_API_KEY)
 
 def generate_health_response(health_context):
     """Generate structured health advice based on user stats"""
@@ -40,8 +40,7 @@ def generate_health_response(health_context):
             }
         },
         "recommendations": []
-         }
-    
+    }
     
     if response["overview"]["water"]["status"] == "needs_attention":
         response["recommendations"].append({
@@ -112,38 +111,22 @@ Remember to:
 - Include scientific backing when relevant
 - Suggest lifestyle modifications if appropriate
 - For heavy meals, provide specific portion control advice and meal planning tips
-
-
 """
 
-        # API request
-        headers = {
-            "Authorization": f"Bearer {WORQHAT_API_KEY}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "training_data": training_prompt,
-            "question": user_message,
-            "model": "aicon-v4-nano-160824",
-            "randomness": 0.3,
-        }
-
-        response = requests.post(
-            WORQHAT_API_URL,
-            headers=headers,
-            json=payload,
-        )
-
-        if response.status_code == 200:
-            result = response.json()
+        # Initialize Gemini model
+        model = genai.GenerativeModel('gemini-pro')
+        
+        # Generate response using Gemini API
+        response = model.generate_content(training_prompt)
+        
+        if response.text:
             return jsonify({
                 'status': 'success',
-                'message': result.get('content', result.get('text', 'No response content')),
+                'message': response.text,
                 'analysis': health_analysis
             })
         else:
-            return jsonify({'error': f'API Error: {response.text}'}), response.status_code
+            return jsonify({'error': 'No response content from Gemini API'}), 500
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
